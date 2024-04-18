@@ -1,0 +1,99 @@
+(kicad_sch (version 20230121) (generator eeschema)
+
+  (uuid 60961b84-5302-475d-9d71-3d4a2fb04e42)
+
+  (paper "A4")
+
+  (lib_symbols
+  )
+
+
+  (sheet (at 200.66 58.42) (size 40.64 27.94) (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0.0000))
+    (uuid 204f96f2-a7f9-4894-a3c9-2bd96a087183)
+    (property "Sheetname" "flash" (at 200.66 57.7084 0)
+      (effects (font (size 1.27 1.27)) (justify left bottom))
+    )
+    (property "Sheetfile" "flash.kicad_sch" (at 200.66 86.9446 0)
+      (effects (font (size 1.27 1.27)) (justify left top))
+    )
+    (instances
+      (project "eins2440"
+        (path "/60961b84-5302-475d-9d71-3d4a2fb04e42" (page "4"))
+      )
+    )
+  )
+
+  (sheet (at 129.54 58.42) (size 40.64 27.94) (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0.0000))
+    (uuid 56b52ac3-829c-416c-9c0b-963347116c6a)
+    (property "Sheetname" "ram" (at 129.54 57.7084 0)
+      (effects (font (size 1.27 1.27)) (justify left bottom))
+    )
+    (property "Sheetfile" "ram.kicad_sch" (at 129.54 86.9446 0)
+      (effects (font (size 1.27 1.27)) (justify left top))
+    )
+    (instances
+      (project "eins2440"
+        (path "/60961b84-5302-475d-9d71-3d4a2fb04e42" (page "3"))
+      )
+    )
+  )
+
+  (sheet (at 128.27 118.11) (size 40.64 27.94) (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0.0000))
+    (uuid 8be3d9ab-c4e5-422f-b2f2-de5cf31997fd)
+    (property "Sheetname" "ethernet" (at 128.27 117.3984 0)
+      (effects (font (size 1.27 1.27)) (justify left bottom))
+    )
+    (property "Sheetfile" "ethernet.kicad_sch" (at 128.27 146.6346 0)
+      (effects (font (size 1.27 1.27)) (justify left top))
+    )
+    (instances
+      (project "eins2440"
+        (path "/60961b84-5302-475d-9d71-3d4a2fb04e42" (page "6"))
+      )
+    )
+  )
+
+  (sheet (at 53.34 118.11) (size 40.64 27.94) (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0.0000))
+    (uuid db6ffc15-4063-4400-93d2-790bd03caa14)
+    (property "Sheetname" "misc" (at 53.34 117.3984 0)
+      (effects (font (size 1.27 1.27)) (justify left bottom))
+    )
+    (property "Sheetfile" "misc.kicad_sch" (at 53.34 146.6346 0)
+      (effects (font (size 1.27 1.27)) (justify left top))
+    )
+    (instances
+      (project "eins2440"
+        (path "/60961b84-5302-475d-9d71-3d4a2fb04e42" (page "5"))
+      )
+    )
+  )
+
+  (sheet (at 53.34 58.42) (size 40.64 27.94) (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0.0000))
+    (uuid f5b13fbc-bcb8-4fe2-9959-0bda724aaa80)
+    (property "Sheetname" "soc" (at 53.34 57.7084 0)
+      (effects (font (size 1.27 1.27)) (justify left bottom))
+    )
+    (property "Sheetfile" "soc.kicad_sch" (at 53.34 86.9446 0)
+      (effects (font (size 1.27 1.27)) (justify left top))
+    )
+    (instances
+      (project "eins2440"
+        (path "/60961b84-5302-475d-9d71-3d4a2fb04e42" (page "2"))
+      )
+    )
+  )
+
+  (sheet_instances
+    (path "/" (page "1"))
+  )
+)
