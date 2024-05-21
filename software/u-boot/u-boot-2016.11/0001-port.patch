@@ -1,0 +1,1782 @@
+From 893f3c5cf4e6381e773877b5fc65d094699f00fd Mon Sep 17 00:00:00 2001
+From: Your Name <you@example.com>
+Date: Tue, 21 May 2024 19:18:12 +0800
+Subject: [PATCH] port
+
+---
+ Makefile                                    |   1 +
+ arch/arm/Kconfig                            |   5 +
+ arch/arm/include/asm/arch-s3c24x0/s3c24x0.h |   2 +-
+ board/samsung/eins2440/Kconfig              |  15 ++
+ board/samsung/eins2440/MAINTAINERS          |   6 +
+ board/samsung/eins2440/Makefile             |   9 +
+ board/samsung/eins2440/eins2440.c           | 138 ++++++++++++
+ board/samsung/eins2440/lowlevel_init.S      | 146 +++++++++++++
+ common/console.c                            |   4 +
+ common/lcd.c                                |  10 +-
+ configs/eins2440_defconfig                  |  18 ++
+ drivers/dma/Kconfig                         |   5 +
+ drivers/dma/Makefile                        |   1 +
+ drivers/dma/s3c2440_dma.c                   |  87 ++++++++
+ drivers/gpio/Kconfig                        |   8 +
+ drivers/mtd/jedec_flash.c                   |  17 ++
+ drivers/mtd/nand/Makefile                   |   1 +
+ drivers/mtd/nand/s3c2440_nand.c             | 171 +++++++++++++++
+ drivers/net/dm9000x.c                       |   4 +-
+ drivers/spi/Kconfig                         |   5 +
+ drivers/spi/Makefile                        |   2 +
+ drivers/spi/s3c2440_spi.c                   | 100 +++++++++
+ drivers/video/Kconfig                       |   5 +
+ drivers/video/Makefile                      |   1 +
+ drivers/video/st7789_lcd.c                  | 195 +++++++++++++++++
+ include/configs/eins2440.h                  | 225 ++++++++++++++++++++
+ include/env_default.h                       |   3 +
+ include/lcd.h                               |  14 +-
+ include/s3c2440_dma.h                       |  78 +++++++
+ include/s3c2440_spi.h                       |  55 +++++
+ scripts/config_whitelist.txt                |   3 +
+ tools/Makefile                              |   2 +-
+ tools/logos/eins2440.bmp                    | Bin 0 -> 13078 bytes
+ 33 files changed, 1321 insertions(+), 15 deletions(-)
+ create mode 100644 board/samsung/eins2440/Kconfig
+ create mode 100644 board/samsung/eins2440/MAINTAINERS
+ create mode 100644 board/samsung/eins2440/Makefile
+ create mode 100644 board/samsung/eins2440/eins2440.c
+ create mode 100644 board/samsung/eins2440/lowlevel_init.S
+ create mode 100644 configs/eins2440_defconfig
+ create mode 100644 drivers/dma/s3c2440_dma.c
+ create mode 100644 drivers/mtd/nand/s3c2440_nand.c
+ create mode 100644 drivers/spi/s3c2440_spi.c
+ create mode 100644 drivers/video/st7789_lcd.c
+ create mode 100644 include/configs/eins2440.h
+ create mode 100644 include/s3c2440_dma.h
+ create mode 100644 include/s3c2440_spi.h
+ create mode 100644 tools/logos/eins2440.bmp
+
+diff --git a/Makefile b/Makefile
+index 8ca1db5..fa691af 100644
+--- a/Makefile
++++ b/Makefile
+@@ -784,6 +784,7 @@ ALL-y += $(CONFIG_BUILD_TARGET:"%"=%)
+ endif
+ 
+ LDFLAGS_u-boot += $(LDFLAGS_FINAL)
++LDFLAGS_u-boot += $(call ld-option, --no-dynamic-linker)
+ ifneq ($(CONFIG_SYS_TEXT_BASE),)
+ LDFLAGS_u-boot += -Ttext $(CONFIG_SYS_TEXT_BASE)
+ endif
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d7a9b11..58ab005 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -145,6 +145,10 @@ config TARGET_SMDK2410
+ 	bool "Support smdk2410"
+ 	select CPU_ARM920T
+ 
++config TARGET_EINS2440
++	bool "Support eins2440"
++	select CPU_ARM920T
++
+ config TARGET_ASPENITE
+ 	bool "Support aspenite"
+ 	select CPU_ARM926EJS
+@@ -992,6 +996,7 @@ source "board/phytec/pcm051/Kconfig"
+ source "board/phytec/pcm052/Kconfig"
+ source "board/ppcag/bg0900/Kconfig"
+ source "board/samsung/smdk2410/Kconfig"
++source "board/samsung/eins2440/Kconfig"
+ source "board/sandisk/sansa_fuze_plus/Kconfig"
+ source "board/schulercontrol/sc_sps_1/Kconfig"
+ source "board/siemens/draco/Kconfig"
+diff --git a/arch/arm/include/asm/arch-s3c24x0/s3c24x0.h b/arch/arm/include/asm/arch-s3c24x0/s3c24x0.h
+index 2dae9fc..6958862 100644
+--- a/arch/arm/include/asm/arch-s3c24x0/s3c24x0.h
++++ b/arch/arm/include/asm/arch-s3c24x0/s3c24x0.h
+@@ -86,7 +86,7 @@ struct s3c24x0_dma {
+ 	u32	dmasktrig;
+ #if defined(CONFIG_S3C2400) || defined(CONFIG_S3C2410) \
+ 		|| defined(CONFIG_S3C2440)
+-	u32	res[1];
++	u32	res[7];
+ #endif
+ };
+ 
+diff --git a/board/samsung/eins2440/Kconfig b/board/samsung/eins2440/Kconfig
+new file mode 100644
+index 0000000..dbfe519
+--- /dev/null
++++ b/board/samsung/eins2440/Kconfig
+@@ -0,0 +1,15 @@
++if TARGET_EINS2440
++
++config SYS_BOARD
++	default "eins2440"
++
++config SYS_VENDOR
++	default "samsung"
++
++config SYS_SOC
++	default "s3c24x0"
++
++config SYS_CONFIG_NAME
++	default "eins2440"
++
++endif
+diff --git a/board/samsung/eins2440/MAINTAINERS b/board/samsung/eins2440/MAINTAINERS
+new file mode 100644
+index 0000000..2809b1b
+--- /dev/null
++++ b/board/samsung/eins2440/MAINTAINERS
+@@ -0,0 +1,6 @@
++EINS2440 BOARD
++M:	madeinchaos <https://github.com/madeinchaos>
++S:	Maintained
++F:	board/samsung/eins2440/
++F:	include/configs/eins2440.h
++F:	configs/eins2440_defconfig
+diff --git a/board/samsung/eins2440/Makefile b/board/samsung/eins2440/Makefile
+new file mode 100644
+index 0000000..dd85c46
+--- /dev/null
++++ b/board/samsung/eins2440/Makefile
+@@ -0,0 +1,9 @@
++#
++# (C) Copyright 2000-2006
++# madeinchaos <https://github.com/madeinchaos>
++#
++# SPDX-License-Identifier:	GPL-2.0+
++#
++
++obj-y	:= eins2440.o
++obj-y	+= lowlevel_init.o
+diff --git a/board/samsung/eins2440/eins2440.c b/board/samsung/eins2440/eins2440.c
+new file mode 100644
+index 0000000..b4cb03f
+--- /dev/null
++++ b/board/samsung/eins2440/eins2440.c
+@@ -0,0 +1,138 @@
++/*
++ * (C) Copyright 2024
++ * madeinchaos <https://github.com/madeinchaos>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <netdev.h>
++#include <asm/io.h>
++#include <asm/arch/s3c24x0_cpu.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++#define FCLK_SPEED 1
++
++#if (FCLK_SPEED == 0)		/* Fout = 203MHz, Fin = 12MHz for Audio */
++#define M_MDIV	0xC3
++#define M_PDIV	0x4
++#define M_SDIV	0x1
++#elif (FCLK_SPEED == 1)		/* Fout = 400MHz, Fout = 2 * m * Fin / (p*(2^S)), FVCO = 2 * m * Fin / p where: m=MDIV+8, p=PDIV+2, s=SDIV */
++#define M_MDIV	0x5C
++#define M_PDIV	0x1
++#define M_SDIV	0x1
++#endif
++
++#define USB_CLOCK 1
++
++#if (USB_CLOCK == 0)
++#define U_M_MDIV	0xA1
++#define U_M_PDIV	0x3
++#define U_M_SDIV	0x1
++#elif (USB_CLOCK == 1)
++#define U_M_MDIV	0x48
++#define U_M_PDIV	0x3
++#define U_M_SDIV	0x2
++#endif
++
++static inline void pll_delay(unsigned long loops)
++{
++	__asm__ volatile ("1:\n"
++	  "subs %0, %1, #1\n"
++	  "bne 1b" : "=r" (loops) : "0" (loops));
++}
++
++/*
++ * Miscellaneous platform dependent initialisations
++ */
++
++int board_early_init_f(void)
++{
++	struct s3c24x0_clock_power * const clk_power =
++					s3c24x0_get_base_clock_power();
++	struct s3c24x0_gpio * const gpio = s3c24x0_get_base_gpio();
++
++	/* FCLK:HCLK:PCLK = 1:4:8 */
++	writel(5, &clk_power->clkdivn);
++
++	/* to reduce PLL lock time, adjust the LOCKTIME register */
++	writel(0xFFFFFF, &clk_power->locktime);
++
++	/* configure MPLL */
++	writel((M_MDIV << 12) + (M_PDIV << 4) + M_SDIV,
++	       &clk_power->mpllcon);
++
++	/* some delay between MPLL and UPLL */
++	pll_delay(4000);
++
++	/* configure UPLL */
++	writel((U_M_MDIV << 12) + (U_M_PDIV << 4) + U_M_SDIV,
++	       &clk_power->upllcon);
++
++	/* some delay between MPLL and UPLL */
++	pll_delay(8000);
++
++	/* set up the I/O ports */
++	writel(0x007FFFFF, &gpio->gpacon);
++	writel(0x00044555, &gpio->gpbcon);
++	writel(0x000007FF, &gpio->gpbup);
++	writel(0xAAAAAAAA, &gpio->gpccon);
++	writel(0x0000FFFF, &gpio->gpcup);
++	writel(0xAAAAAAAA, &gpio->gpdcon);
++	writel(0x0000FFFF, &gpio->gpdup);
++	writel(0xAAAAAAAA, &gpio->gpecon);
++	writel(0x0000FFFF, &gpio->gpeup);
++	writel(0x000055AA, &gpio->gpfcon);
++	writel(0x000000FF, &gpio->gpfup);
++	writel(0xFF95FFBA, &gpio->gpgcon);
++	writel(0x0000FFFF, &gpio->gpgup);
++	writel(0x002AFAAA, &gpio->gphcon);
++	writel(0x000007FF, &gpio->gphup);
++
++	return 0;
++}
++
++int board_init(void)
++{
++	/* arch number of SMDK2410-Board */
++	gd->bd->bi_arch_number = MACH_TYPE_SMDK2410;
++
++	/* adress of boot parameters */
++	gd->bd->bi_boot_params = 0x30000100;
++
++	icache_enable();
++	dcache_enable();
++
++	return 0;
++}
++
++int dram_init(void)
++{
++	/* dram_init must store complete ramsize in gd->ram_size */
++	gd->ram_size = PHYS_SDRAM_1_SIZE;
++	return 0;
++}
++
++#ifdef CONFIG_CMD_NET
++int board_eth_init(bd_t *bis)
++{
++	int rc = 0;
++#ifdef CONFIG_DRIVER_DM9000
++	rc = dm9000_initialize(bis);
++#endif
++	return rc;
++}
++#endif
++
++/*
++ * Hardcoded flash setup:
++ * Flash 0 is a non-CFI AMD AM29LV800BB flash.
++ */
++ulong board_flash_get_legacy(ulong base, int banknum, flash_info_t *info)
++{
++	info->portwidth = FLASH_CFI_16BIT;
++	info->chipwidth = FLASH_CFI_BY16;
++	info->interface = FLASH_CFI_X16;
++	return 1;
++}
+diff --git a/board/samsung/eins2440/lowlevel_init.S b/board/samsung/eins2440/lowlevel_init.S
+new file mode 100644
+index 0000000..9798ca2
+--- /dev/null
++++ b/board/samsung/eins2440/lowlevel_init.S
+@@ -0,0 +1,146 @@
++/*
++ * Memory Setup stuff - taken from blob memsetup.S
++ *
++ * Copyright (C) 1999 2000 2001 Erik Mouw (J.A.K.Mouw@its.tudelft.nl) and
++ *                     Jan-Derk Bakker (J.D.Bakker@its.tudelft.nl)
++ *
++ * Modified for the Samsung SMDK2410 by
++ * (C) Copyright 2002
++ * David Mueller, ELSOFT AG, <d.mueller@elsoft.ch>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++
++#include <config.h>
++
++/* some parameters for the board */
++
++/*
++ *
++ * Taken from linux/arch/arm/boot/compressed/head-s3c2410.S
++ *
++ * Copyright (C) 2002 Samsung Electronics SW.LEE  <hitchcar@sec.samsung.com>
++ *
++ */
++
++#define BWSCON	0x48000000
++
++/* BWSCON */
++#define DW8			(0x0)
++#define DW16			(0x1)
++#define DW32			(0x2)
++#define WAIT			(0x1<<2)
++#define UBLB			(0x1<<3)
++
++#define B1_BWSCON		(DW32)
++#define B2_BWSCON		(DW16)
++#define B3_BWSCON		(DW16 + WAIT + UBLB)
++#define B4_BWSCON		(DW16)
++#define B5_BWSCON		(DW16)
++#define B6_BWSCON		(DW32)
++#define B7_BWSCON		(DW32)
++
++/* BANK0CON */
++#define B0_Tacs			0x0	/*  0clk */
++#define B0_Tcos			0x0	/*  0clk */
++#define B0_Tacc			0x7	/* 14clk */
++#define B0_Tcoh			0x0	/*  0clk */
++#define B0_Tah			0x0	/*  0clk */
++#define B0_Tacp			0x0
++#define B0_PMC			0x0	/* normal */
++
++/* BANK1CON */
++#define B1_Tacs			0x0	/*  0clk */
++#define B1_Tcos			0x0	/*  0clk */
++#define B1_Tacc			0x7	/* 14clk */
++#define B1_Tcoh			0x0	/*  0clk */
++#define B1_Tah			0x0	/*  0clk */
++#define B1_Tacp			0x0
++#define B1_PMC			0x0
++
++#define B2_Tacs			0x0
++#define B2_Tcos			0x0
++#define B2_Tacc			0x7
++#define B2_Tcoh			0x0
++#define B2_Tah			0x0
++#define B2_Tacp			0x0
++#define B2_PMC			0x0
++
++#define B3_Tacs			0x0	/*  0clk */
++#define B3_Tcos			0x3	/*  4clk */
++#define B3_Tacc			0x7	/* 14clk */
++#define B3_Tcoh			0x1	/*  1clk */
++#define B3_Tah			0x0	/*  0clk */
++#define B3_Tacp			0x3     /*  6clk */
++#define B3_PMC			0x0	/* normal */
++
++#define B4_Tacs			0x0	/*  0clk */
++#define B4_Tcos			0x0	/*  0clk */
++#define B4_Tacc			0x7	/* 14clk */
++#define B4_Tcoh			0x0	/*  0clk */
++#define B4_Tah			0x0	/*  0clk */
++#define B4_Tacp			0x0
++#define B4_PMC			0x0	/* normal */
++
++#define B5_Tacs			0x0	/*  0clk */
++#define B5_Tcos			0x0	/*  0clk */
++#define B5_Tacc			0x7	/* 14clk */
++#define B5_Tcoh			0x0	/*  0clk */
++#define B5_Tah			0x0	/*  0clk */
++#define B5_Tacp			0x0
++#define B5_PMC			0x0	/* normal */
++
++#define B6_MT			0x3	/* SDRAM */
++#define B6_Trcd			0x1
++#define B6_SCAN			0x1	/* 9bit */
++
++#define B7_MT			0x3	/* SDRAM */
++#define B7_Trcd			0x1	/* 3clk */
++#define B7_SCAN			0x1	/* 9bit */
++
++/* REFRESH parameter */
++#define REFEN			0x1	/* Refresh enable */
++#define TREFMD			0x0	/* CBR(CAS before RAS)/Auto refresh */
++#define Trp			0x0	/* 2clk */
++#define Trc			0x3	/* 7clk */
++#define Tchr			0x2	/* 3clk */
++#define REFCNT			1269	/* period=15.6us, HCLK=60Mhz, (2048+1-15.6*60) */
++/**************************************/
++
++.globl lowlevel_init
++lowlevel_init:
++	/* memory control configuration */
++	/* make r0 relative the current location so that it */
++	/* reads SMRDATA out of FLASH rather than memory ! */
++	ldr     r0, =SMRDATA
++	ldr	r1, =CONFIG_SYS_TEXT_BASE
++	sub	r0, r0, r1
++	ldr	r1, =BWSCON	/* Bus Width Status Controller */
++	add     r2, r0, #13*4
++0:
++	ldr     r3, [r0], #4
++	str     r3, [r1], #4
++	cmp     r2, r0
++	bne     0b
++
++	/* everything is fine now */
++	mov	pc, lr
++
++	.ltorg
++/* the literal pools origin */
++
++SMRDATA:
++    .word (0+(B1_BWSCON<<4)+(B2_BWSCON<<8)+(B3_BWSCON<<12)+(B4_BWSCON<<16)+(B5_BWSCON<<20)+(B6_BWSCON<<24)+(B7_BWSCON<<28))
++    .word ((B0_Tacs<<13)+(B0_Tcos<<11)+(B0_Tacc<<8)+(B0_Tcoh<<6)+(B0_Tah<<4)+(B0_Tacp<<2)+(B0_PMC))
++    .word ((B1_Tacs<<13)+(B1_Tcos<<11)+(B1_Tacc<<8)+(B1_Tcoh<<6)+(B1_Tah<<4)+(B1_Tacp<<2)+(B1_PMC))
++    .word ((B2_Tacs<<13)+(B2_Tcos<<11)+(B2_Tacc<<8)+(B2_Tcoh<<6)+(B2_Tah<<4)+(B2_Tacp<<2)+(B2_PMC))
++    .word ((B3_Tacs<<13)+(B3_Tcos<<11)+(B3_Tacc<<8)+(B3_Tcoh<<6)+(B3_Tah<<4)+(B3_Tacp<<2)+(B3_PMC))
++    .word ((B4_Tacs<<13)+(B4_Tcos<<11)+(B4_Tacc<<8)+(B4_Tcoh<<6)+(B4_Tah<<4)+(B4_Tacp<<2)+(B4_PMC))
++    .word ((B5_Tacs<<13)+(B5_Tcos<<11)+(B5_Tacc<<8)+(B5_Tcoh<<6)+(B5_Tah<<4)+(B5_Tacp<<2)+(B5_PMC))
++    .word ((B6_MT<<15)+(B6_Trcd<<2)+(B6_SCAN))
++    .word ((B7_MT<<15)+(B7_Trcd<<2)+(B7_SCAN))
++    .word ((REFEN<<23)+(TREFMD<<22)+(Trp<<20)+(Trc<<18)+(Tchr<<16)+REFCNT)
++    .word 0xB1
++    .word 0x30
++    .word 0x30
+diff --git a/common/console.c b/common/console.c
+index e1d8476..1733afa 100644
+--- a/common/console.c
++++ b/common/console.c
+@@ -496,6 +496,8 @@ void putc(const char c)
+ 	if (gd->flags & GD_FLG_DEVINIT) {
+ 		/* Send to the standard output */
+ 		fputc(stdout, c);
++		pre_console_putc(c);
++		serial_putc(c);
+ 	} else {
+ 		/* Send directly to the handler */
+ 		pre_console_putc(c);
+@@ -541,6 +543,8 @@ void puts(const char *s)
+ 	if (gd->flags & GD_FLG_DEVINIT) {
+ 		/* Send to the standard output */
+ 		fputs(stdout, s);
++		pre_console_puts(s);
++		serial_puts(s);
+ 	} else {
+ 		/* Send directly to the handler */
+ 		pre_console_puts(s);
+diff --git a/common/lcd.c b/common/lcd.c
+index 783626e..dde1167 100644
+--- a/common/lcd.c
++++ b/common/lcd.c
+@@ -189,9 +189,9 @@ void lcd_clear(void)
+ #endif
+ 
+ #ifndef CONFIG_SYS_WHITE_ON_BLACK
+-	lcd_setfgcolor(CONSOLE_COLOR_BLACK);
+-	lcd_setbgcolor(CONSOLE_COLOR_WHITE);
+-	bg_color = CONSOLE_COLOR_WHITE;
++	lcd_setfgcolor(CONSOLE_COLOR_GREEN);
++	lcd_setbgcolor(CONSOLE_COLOR_BLACK);
++	bg_color = CONSOLE_COLOR_BLACK;
+ #else
+ 	lcd_setfgcolor(CONSOLE_COLOR_WHITE);
+ 	lcd_setbgcolor(CONSOLE_COLOR_BLACK);
+@@ -375,7 +375,9 @@ void lcd_logo_plot(int x, int y)
+ 					((col16 & 0x000F) << 1) |
+ 					((col16 & 0x00F0) << 3) |
+ 					((col16 & 0x0F00) << 4);
+-				}
++			
++				fb16[j] = (fb16[j] >> 8) | (fb16[j] << 8);
++			}
+ 			bmap += BMP_LOGO_WIDTH;
+ 			fb16 += panel_info.vl_col;
+ 		}
+diff --git a/configs/eins2440_defconfig b/configs/eins2440_defconfig
+new file mode 100644
+index 0000000..c493989
+--- /dev/null
++++ b/configs/eins2440_defconfig
+@@ -0,0 +1,18 @@
++CONFIG_ARM=y
++CONFIG_TARGET_EINS2440=y
++# CONFIG_SYS_STDIO_DEREGISTER is not set
++# CONFIG_DISPLAY_BOARDINFO is not set
++CONFIG_HUSH_PARSER=y
++CONFIG_SYS_PROMPT="# "
++CONFIG_CMD_USB=y
++# CONFIG_CMD_SETEXPR is not set
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_PING=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_UBI=y
++CONFIG_USB=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_KEYBOARD=y
++CONFIG_CMD_BOOTZ=y
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 1b92c77..70cf3d1 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -19,4 +19,9 @@ config TI_EDMA3
+ 	  This driver support data transfer between memory
+ 	  regions.
+ 
++config S3C2440_DMA
++	bool "S3C2440_DMA driver"
++	help
++	  S3C2440_DMA driver.
++
+ endmenu # menu "DMA Support"
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 39b78b2..b341123 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -13,3 +13,4 @@ obj-$(CONFIG_FSL_DMA) += fsl_dma.o
+ obj-$(CONFIG_TI_KSNAV) += keystone_nav.o keystone_nav_cfg.o
+ obj-$(CONFIG_TI_EDMA3) += ti-edma3.o
+ obj-$(CONFIG_DMA_LPC32XX) += lpc32xx_dma.o
++obj-$(CONFIG_S3C2440_DMA) += s3c2440_dma.o
+\ No newline at end of file
+diff --git a/drivers/dma/s3c2440_dma.c b/drivers/dma/s3c2440_dma.c
+new file mode 100644
+index 0000000..bf4fdb0
+--- /dev/null
++++ b/drivers/dma/s3c2440_dma.c
+@@ -0,0 +1,87 @@
++/*
++ * S3C2440 DMA controller interface support functions
++ *
++ * Copyright (C) 2024 madeinchaos <https://github.com/madeinchaos>
++ *
++ */
++
++#include <common.h>
++#include <errno.h>
++#include <asm/io.h>
++#include <asm/arch/s3c2440.h>
++#include <s3c2440_dma.h>
++
++/* 
++ * DMA channel on/off bit.
++ * 0: DMA channel is turned off.
++ * (DMA request to this channel is ignored.)
++ * 1: DMA channel is turned on and the DMA request is handled. This
++ * bit is automatically set to off if we set the DCONn[22] bit to “no
++ * auto reload” and/or STOP bit of DMASKTRIGn to “stop”.
++ * Note that when DCON[22] bit is "no auto reload", this bit becomes
++ * 0 when CURR_TC reaches 0. If the STOP bit is 1, this bit becomes
++ * 0 as soon as the current atomic transfer is completed.
++*/
++#define S3C2440_DMA_DMASKTRIG_ON_OFF(x)  ((x)<<1)
++
++/* 
++ * Trigger the DMA channel in S/W request mode.
++ * 1: it requests a DMA operation to this controller.
++ * Note that this trigger gets effective after S/W request mode has to
++ * be selected (DCONn[23]) and channel ON_OFF bit has to be set to
++ * 1 (channel on). When DMA operation starts, this bit is cleared
++ * automatically.
++*/
++#define S3C2440_DMA_DMASKTRIG_SW_TRIG(x)  ((x)<<0)
++
++struct s3c24x0_dma *s3c2440_get_dma(u8 chl)
++{
++	if (chl > S3C2440_DMA_CHL3) {
++		return NULL;
++	}
++
++	struct s3c24x0_dmas * const dmas = s3c24x0_get_base_dmas();
++	return &(dmas->dma[chl]);
++}
++
++void s3c2440_dma_set_src(u8 chl, u32 disrc, u32 disrcc)
++{
++	struct s3c24x0_dma *dma = s3c2440_get_dma(chl);
++
++	if (dma) {
++		writel(disrc, &dma->disrc);
++		writel(disrcc, &dma->disrcc);
++	}
++}
++
++void s3c2440_dma_set_dst(u8 chl, u32 didst, u32 didstc)
++{
++	struct s3c24x0_dma *dma = s3c2440_get_dma(chl);
++
++	if (dma) {
++		writel(didst, &dma->didst);
++		writel(didstc, &dma->didstc);
++	}
++}
++
++void s3c2440_dma_set_control(u8 chl, u32 val)
++{
++	struct s3c24x0_dma *dma = s3c2440_get_dma(chl);
++
++	if (dma) {
++		writel(val, &dma->dcon);
++	}
++}
++
++void s3c2440_dma_trigger(u8 chl)
++{
++	struct s3c24x0_dma *dma = s3c2440_get_dma(chl);
++	u32 val = 0;
++
++	if (dma) {
++		val |= S3C2440_DMA_DMASKTRIG_ON_OFF(1);
++		val |= S3C2440_DMA_DMASKTRIG_SW_TRIG(1);
++		writel(val, &dma->dmasktrig);
++	}
++}
++
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 8d9ab52..017b343 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -221,4 +221,12 @@ config MPC85XX_GPIO
+ 
+ 	  The driver has been tested on MPC85XX, but it is likely that other
+ 	  PowerQUICC III devices will work as well.
++
++config S3C2440_GPIO
++	bool "samsung S3C2440 GPIO driver"
++	depends on DM_GPIO
++	help
++	  The driver has been tested on EINS2440, it is likely that other
++	  devices will NOT work as well.
++
+ endmenu
+diff --git a/drivers/mtd/jedec_flash.c b/drivers/mtd/jedec_flash.c
+index ce9af8f..01b3fe1 100644
+--- a/drivers/mtd/jedec_flash.c
++++ b/drivers/mtd/jedec_flash.c
+@@ -400,6 +400,23 @@ static const struct amd_flash_info jedec_table[] = {
+ 			ERASEINFO(0x10000, 7),
+ 		}
+ 	},
++	{
++		.mfr_id 	= (u16)EON_ALT_MANU,
++		.dev_id 	= AM29LV160DB,
++		.name		= "EON EN29LV160AB",
++		.uaddr		= {
++				[1] = MTD_UADDR_0x0555_0x02AA /* x16 */
++		},
++		.DevSize		= SIZE_2MiB,
++		.CmdSet 		= P_ID_AMD_STD,
++		.NumEraseRegions	= 4,
++		.regions			= {
++			ERASEINFO(0x04000, 1),
++			ERASEINFO(0x02000, 2),
++			ERASEINFO(0x08000, 1),
++			ERASEINFO(0x10000, 31),
++		}
++	},
+ #endif
+ };
+ 
+diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+index 1df9273..909f8e6 100644
+--- a/drivers/mtd/nand/Makefile
++++ b/drivers/mtd/nand/Makefile
+@@ -61,6 +61,7 @@ obj-$(CONFIG_NAND_MXS) += mxs_nand.o
+ obj-$(CONFIG_NAND_NDFC) += ndfc.o
+ obj-$(CONFIG_NAND_PXA3XX) += pxa3xx_nand.o
+ obj-$(CONFIG_NAND_S3C2410) += s3c2410_nand.o
++obj-$(CONFIG_NAND_S3C2440) += s3c2440_nand.o
+ obj-$(CONFIG_NAND_SPEAR) += spr_nand.o
+ obj-$(CONFIG_TEGRA_NAND) += tegra_nand.o
+ obj-$(CONFIG_NAND_OMAP_GPMC) += omap_gpmc.o
+diff --git a/drivers/mtd/nand/s3c2440_nand.c b/drivers/mtd/nand/s3c2440_nand.c
+new file mode 100644
+index 0000000..7660ad3
+--- /dev/null
++++ b/drivers/mtd/nand/s3c2440_nand.c
+@@ -0,0 +1,171 @@
++/*
++ * (C) Copyright 2006 OpenMoko, Inc.
++ * Author: Harald Welte <laforge@openmoko.org>
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++
++#include <nand.h>
++#include <asm/arch/s3c24x0_cpu.h>
++#include <asm/io.h>
++
++#define S3C2440_NFCONT_InitECC		(1<<4)
++#define S3C2440_NFCONT_nFCE		(1<<1)
++#define S3C2440_NFCONT_EN		(1<<0)
++
++#define S3C2440_NFCONF_TACLS(x)	((x)<<12)
++#define S3C2440_NFCONF_TWRPH0(x)	((x)<<8)
++#define S3C2440_NFCONF_TWRPH1(x)	((x)<<4)
++
++#ifdef CONFIG_NAND_SPL
++
++/* in the early stage of NAND flash booting, printf() is not available */
++#define printf(fmt, args...)
++
++static void nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
++{
++	int i;
++	struct nand_chip *this = mtd_to_nand(mtd);
++
++	for (i = 0; i < len; i++)
++		buf[i] = readb(this->IO_ADDR_R);
++}
++#endif
++
++static void s3c24x0_hwcontrol(struct mtd_info *mtd, int cmd, unsigned int ctrl)
++{
++	struct s3c24x0_nand *nand = s3c24x0_get_base_nand();
++
++	debug("hwcontrol(): 0x%02x 0x%02x\n", cmd, ctrl);
++
++	if (ctrl & NAND_CTRL_CHANGE) {
++
++		if (ctrl & NAND_NCE)
++			writel(readl(&nand->nfcont) & ~S3C2440_NFCONT_nFCE,
++			       &nand->nfcont);
++		else
++			writel(readl(&nand->nfcont) | S3C2440_NFCONT_nFCE,
++			       &nand->nfcont);
++	}
++	
++	if (ctrl & NAND_CLE)
++		writeb(cmd, &nand->nfcmd);
++
++	if (ctrl & NAND_ALE)
++		writeb(cmd, &nand->nfaddr);
++}
++
++static int s3c24x0_dev_ready(struct mtd_info *mtd)
++{
++	struct s3c24x0_nand *nand = s3c24x0_get_base_nand();
++	debug("dev_ready\n");
++	return readl(&nand->nfstat) & 0x01;
++}
++
++#ifdef CONFIG_S3C2440_NAND_HWECC
++void s3c24x0_nand_enable_hwecc(struct mtd_info *mtd, int mode)
++{
++	struct s3c24x0_nand *nand = s3c24x0_get_base_nand();
++	debug("s3c24x0_nand_enable_hwecc(%p, %d)\n", mtd, mode);
++	writel(readl(&nand->nfconf) | S3C2440_NFCONF_INITECC, &nand->nfconf);
++}
++
++static int s3c24x0_nand_calculate_ecc(struct mtd_info *mtd, const u_char *dat,
++				      u_char *ecc_code)
++{
++	struct s3c24x0_nand *nand = s3c24x0_get_base_nand();
++	ecc_code[0] = readb(&nand->nfecc);
++	ecc_code[1] = readb(&nand->nfecc + 1);
++	ecc_code[2] = readb(&nand->nfecc + 2);
++	debug("s3c24x0_nand_calculate_hwecc(%p,): 0x%02x 0x%02x 0x%02x\n",
++	      mtd , ecc_code[0], ecc_code[1], ecc_code[2]);
++
++	return 0;
++}
++
++static int s3c24x0_nand_correct_data(struct mtd_info *mtd, u_char *dat,
++				     u_char *read_ecc, u_char *calc_ecc)
++{
++	if (read_ecc[0] == calc_ecc[0] &&
++	    read_ecc[1] == calc_ecc[1] &&
++	    read_ecc[2] == calc_ecc[2])
++		return 0;
++
++	printf("s3c24x0_nand_correct_data: not implemented\n");
++	return -EBADMSG;
++}
++#endif
++
++int board_nand_init(struct nand_chip *nand)
++{
++	u_int32_t cfg;
++	u_int8_t tacls, twrph0, twrph1;
++	struct s3c24x0_clock_power *clk_power = s3c24x0_get_base_clock_power();
++	struct s3c24x0_nand *nand_reg = s3c24x0_get_base_nand();
++
++	debug("board_nand_init()\n");
++
++	writel(readl(&clk_power->clkcon) | (1 << 4), &clk_power->clkcon);
++
++	/* initialize hardware */
++#if defined(CONFIG_S3C24XX_CUSTOM_NAND_TIMING)
++	tacls  = CONFIG_S3C24XX_TACLS;
++	twrph0 = CONFIG_S3C24XX_TWRPH0;
++	twrph1 =  CONFIG_S3C24XX_TWRPH1;
++#else
++	tacls = 4;
++	twrph0 = 8;
++	twrph1 = 8;
++#endif
++
++	cfg = 0;
++	cfg |= S3C2440_NFCONF_TACLS(tacls - 1);
++	cfg |= S3C2440_NFCONF_TWRPH0(twrph0 - 1);
++	cfg |= S3C2440_NFCONF_TWRPH1(twrph1 - 1);
++	writel(cfg, &nand_reg->nfconf);
++
++	cfg = 0;
++	cfg |= S3C2440_NFCONT_InitECC;
++	cfg |= S3C2440_NFCONT_nFCE;
++	cfg |= S3C2440_NFCONT_EN;
++	writel(cfg, &nand_reg->nfcont);
++
++	/* initialize nand_chip data structure */
++	nand->IO_ADDR_R = (void *)&nand_reg->nfdata;
++	nand->IO_ADDR_W = (void *)&nand_reg->nfdata;
++
++	nand->select_chip = NULL;
++
++	/* read_buf and write_buf are default */
++	/* read_byte and write_byte are default */
++#ifdef CONFIG_NAND_SPL
++	nand->read_buf = nand_read_buf;
++#endif
++
++	/* hwcontrol always must be implemented */
++	nand->cmd_ctrl = s3c24x0_hwcontrol;
++
++	nand->dev_ready = s3c24x0_dev_ready;
++
++#ifdef CONFIG_S3C2440_NAND_HWECC
++	nand->ecc.hwctl = s3c24x0_nand_enable_hwecc;
++	nand->ecc.calculate = s3c24x0_nand_calculate_ecc;
++	nand->ecc.correct = s3c24x0_nand_correct_data;
++	nand->ecc.mode = NAND_ECC_HW;
++	nand->ecc.size = CONFIG_SYS_NAND_ECCSIZE;
++	nand->ecc.bytes = CONFIG_SYS_NAND_ECCBYTES;
++	nand->ecc.strength = 1;
++#else
++	nand->ecc.mode = NAND_ECC_SOFT;
++#endif
++
++#ifdef CONFIG_S3C2440_NAND_BBT
++	nand->bbt_options |= NAND_BBT_USE_FLASH;
++#endif
++
++	debug("end of nand_init\n");
++
++	return 0;
++}
+diff --git a/drivers/net/dm9000x.c b/drivers/net/dm9000x.c
+index 93c6667..4130a69 100644
+--- a/drivers/net/dm9000x.c
++++ b/drivers/net/dm9000x.c
+@@ -367,9 +367,9 @@ static int dm9000_init(struct eth_device *dev, bd_t *bd)
+ 	while (!(dm9000_phy_read(1) & 0x20)) {	/* autonegation complete bit */
+ 		udelay(1000);
+ 		i++;
+-		if (i == 10000) {
++		if (i == 1000) {
+ 			printf("could not establish link\n");
+-			return 0;
++			break;
+ 		}
+ 	}
+ 
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 0f51b3a..0dbfa15 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -209,4 +209,9 @@ config TI_QSPI
+ 	  Enable the TI Quad-SPI (QSPI) driver for DRA7xx and AM43xx evms.
+ 	  This driver support spi flash single, quad and memory reads.
+ 
++config S3C2440_SPI
++	bool "S3C2440_SPI driver"
++	help
++	  S3C2440_SPI driver.
++
+ endmenu # menu "SPI Support"
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index 247c5f6..bcc0fe1 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -54,3 +54,5 @@ obj-$(CONFIG_TI_QSPI) += ti_qspi.o
+ obj-$(CONFIG_XILINX_SPI) += xilinx_spi.o
+ obj-$(CONFIG_ZYNQ_SPI) += zynq_spi.o
+ obj-$(CONFIG_ZYNQ_QSPI) += zynq_qspi.o
++obj-$(CONFIG_S3C2440_SPI) += s3c2440_spi.o
++
+diff --git a/drivers/spi/s3c2440_spi.c b/drivers/spi/s3c2440_spi.c
+new file mode 100644
+index 0000000..ea98e02
+--- /dev/null
++++ b/drivers/spi/s3c2440_spi.c
+@@ -0,0 +1,100 @@
++/*
++ * s3c2440 SPI driver
++ *
++ * Copyright (C) 2024 madeinchaos <https://github.com/madeinchaos>
++ *
++ */
++#include <common.h>
++#include <errno.h>
++#include <spi.h>
++#include <asm/io.h>
++#include <asm/arch/s3c2440.h>
++#include <s3c2440_spi.h>
++
++static struct s3c24x0_spi_channel *s3c2440_get_spi_chl(u8 chl)
++{
++	if (chl > S3C2440_SPI_CHL1) {
++		return NULL;
++	}
++
++	struct s3c24x0_spi * const spis = s3c24x0_get_base_spi();
++	return &(spis->ch[chl]);
++}
++
++u32 s3c2440_spi_get_dataddr(u8 chl)
++{
++	struct s3c24x0_spi_channel *spi = s3c2440_get_spi_chl(chl);
++
++	if (spi) {
++		return (u32)(&(spi->sptdat));
++	}
++	return 0;
++}
++
++void s3c2440_spi_set_baudrate(u8 chl, int baudrate)
++{
++	struct s3c24x0_spi_channel *spi = s3c2440_get_spi_chl(chl);
++	u8 *addr = &(spi->sppre);
++
++	if (spi) {
++		ulong pclk = get_PCLK();
++		/* Baud rate = PCLK / 2 / (Prescaler value + 1) */
++		writel((pclk / 2 / baudrate) - 1, addr);
++	}
++}
++
++void s3c2440_spi_set_control(u8 chl, u32 val)
++{
++	struct s3c24x0_spi_channel *spi = s3c2440_get_spi_chl(chl);
++	u8 *addr = &(spi->spcon);
++
++	if (spi) {
++		writel(0, addr);
++		writel(val, addr);
++	}
++}
++
++void s3c2440_spi_write(u8 chl, u8 data)
++{
++	struct s3c24x0_spi_channel *spi = s3c2440_get_spi_chl(chl);
++	u8 *addr = &(spi->spsta);
++
++	if (spi) {
++		while (!(readl(addr) & 0x01));
++		addr = &(spi->sptdat);
++		writel(data, addr);
++		addr = &(spi->spsta);
++		while (!(readl(addr) & 0x01));
++	}
++}
++
++u8 s3c2440_spi_write_read(u8 chl, u8 data)
++{
++	struct s3c24x0_spi_channel *spi = s3c2440_get_spi_chl(chl);
++	u8 *addr = &(spi->spsta);
++
++	if (spi) {
++		while (!(readl(addr) & 0x01));
++		addr = &(spi->sptdat);
++		writel(data, addr);
++		addr = &(spi->spsta);
++		while (!(readl(addr) & 0x01));
++		addr = &(spi->sptdat);
++		return readl(addr);
++	}
++
++	return 0;
++}
++
++void s3c2440_spi_gpio_init(u8 chl)
++{
++	if (chl == S3C2440_SPI_CHL0) {
++		u32 val = 0;
++		struct s3c24x0_gpio * const gpio = s3c24x0_get_base_gpio();
++		val = readl(&gpio->gpecon);
++		val &= ~((3<<26)|(3<<24)|(3<<22));
++		val |= ((2<<26)|(2<<24)|(2<<22));
++		writel(val, &gpio->gpecon);
++	}
++}
++
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 577e6d7..6d9745e 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -432,6 +432,11 @@ config VIDEO_TEGRA124
+ 	   enables this support which can be used on devices which
+ 	   have an eDP display connected.
+ 
++config ST7789_LCD
++	bool "Enable video support on ST7789_LCD"
++	help
++	   support on ST7789_LCD
++
+ source "drivers/video/bridge/Kconfig"
+ 
+ config VIDEO
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index db34904..1366974 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -58,6 +58,7 @@ obj-$(CONFIG_VIDEO_VESA) += vesa.o
+ obj-$(CONFIG_FORMIKE) += formike.o
+ obj-$(CONFIG_LG4573) += lg4573.o
+ obj-$(CONFIG_AM335X_LCD) += am335x-fb.o
++obj-$(CONFIG_ST7789_LCD) += st7789_lcd.o
+ 
+ obj-${CONFIG_VIDEO_TEGRA124} += tegra124/
+ obj-${CONFIG_EXYNOS_FB} += exynos/
+diff --git a/drivers/video/st7789_lcd.c b/drivers/video/st7789_lcd.c
+new file mode 100644
+index 0000000..c2a29e5
+--- /dev/null
++++ b/drivers/video/st7789_lcd.c
+@@ -0,0 +1,195 @@
++/*
++ * ST7789 LCD Controller
++ *
++ * Copyright (C) 2024 madeinchaos <https://github.com/madeinchaos>
++ *
++ */
++#include <common.h>
++#include <asm/io.h>
++#include <lcd.h>
++#include <linux/types.h>
++#include <stdarg.h>
++#include <stdio_dev.h>
++#include <asm/arch/s3c2440.h>
++#include <s3c2440_spi.h>
++#include <s3c2440_dma.h>
++
++/* #define DEBUG */
++
++#ifdef CONFIG_LCD
++
++#define GPIO_INPUT  0x0
++#define GPIO_OUTPUT 0x1
++#define ST7789_RES_GPG(x)  ((x)<<10)
++#define ST7789_DC_GPG(x)  ((x)<<12)
++
++#define LCD_COL		240
++#define LCD_ROW		240
++#define SPI_CHL			S3C2440_SPI_CHL0
++#define SPI_BAUDRATE	(25000000)
++#define DMA_CHL		S3C2440_DMA_CHL1
++
++vidinfo_t panel_info = {
++	.vl_col		= LCD_COL,
++	.vl_row		= LCD_ROW,
++	.vl_bpix	= LCD_BPP,
++};
++
++/*
++ * tlv format: cmd, data len, data
++*/
++static const u8 st7789_init_data[] = {
++	0x11, 0x00,
++	0x36, 0x01, 0x00,
++	0x3A, 0x01, 0x05,
++	0xB2, 0x05, 0x0C, 0x0C, 0x00, 0x33, 0x33,
++	0xB7, 0x01, 0x35,
++	0xBB, 0x01, 0x19,
++	0xC0, 0x01, 0x2C,
++	0xC2, 0x01, 0x01,
++	0xC3, 0x01, 0x12,
++	0xC4, 0x01, 0x20,
++	0xC6, 0x01, 0x0F,
++	0xD0, 0x02, 0xA4, 0xA1,
++	0xE0, 0x0E, 0xD0, 0x04, 0x0D, 0x11, 0x13, 0x2B, 0x3F, 0x54, 0x4C, 0x18, 0x0D, 0x0B, 0x1F, 0x23,
++	0xE1, 0x0E, 0xD0, 0x04, 0x0C, 0x11, 0x13, 0x2C, 0x3F, 0x44, 0x51, 0x2F, 0x1F, 0x1F, 0x20, 0x23,
++	0x21, 0x00,
++	0x11, 0x00,
++	0x29, 0x00,
++	/* init region */
++	0x2a, 0x04,  0x00, 0x00, 0x00, LCD_COL - 1,
++	0x2b, 0x04,  0x00, 0x00, 0x00, LCD_ROW - 1,
++	0x2c, 0x00,
++};
++
++static void st7789_spi_init(void)
++{
++	s3c2440_spi_gpio_init(SPI_CHL);
++
++	u32 val = 0;
++	val |= S3C2440_SPI_SPCON_SMOD(2);
++	val |= S3C2440_SPI_SPCON_ENSCK(1);
++	val |= S3C2440_SPI_SPCON_MSTR(1);
++	val |= S3C2440_SPI_SPCON_CPOL(1);
++	val |= S3C2440_SPI_SPCON_CPHA(1);
++	s3c2440_spi_set_control(SPI_CHL, val);
++
++	s3c2440_spi_set_baudrate(SPI_CHL, SPI_BAUDRATE);
++}
++
++static void st7789_lcd_dc_cmd(void)
++{
++	u32 val = 0;
++	struct s3c24x0_gpio * const gpio = s3c24x0_get_base_gpio();
++	val = readl(&gpio->gpgdat);
++	val &= ~(0x1 << 6);
++	writel(val, &gpio->gpgdat);
++}
++
++static void st7789_lcd_dc_data(void)
++{
++	u32 val = 0;
++	struct s3c24x0_gpio * const gpio = s3c24x0_get_base_gpio();
++	val = readl(&gpio->gpgdat);
++	val |= 0x1 << 6;
++	writel(val, &gpio->gpgdat);
++}
++
++static void st7789_lcd_reset(void)
++{
++	u32 val = 0;
++
++	struct s3c24x0_gpio * const gpio = s3c24x0_get_base_gpio();
++
++	val = readl(&gpio->gpgdat);
++	val &= ~(0x1 << 5);
++	writel(val, &gpio->gpgdat);
++	mdelay(100);
++	val = readl(&gpio->gpgdat);
++	val |= 0x1 << 5;
++	writel(val, &gpio->gpgdat);
++	mdelay(100);
++}
++
++static void st7789_lcd_write_cmd(u8 cmd)
++{
++	st7789_lcd_dc_cmd();
++	s3c2440_spi_write(SPI_CHL, cmd);
++}
++
++static void st7789_lcd_write_data(u8 data)
++{
++	st7789_lcd_dc_data();
++	s3c2440_spi_write(SPI_CHL, data);
++}
++
++void st7789_lcd_write_color(u16 color)
++{
++	st7789_lcd_write_data(color >> 8);
++	st7789_lcd_write_data(color);
++}
++
++static void st7789_lcd_init(void)
++{
++	int i, j, data_len;
++
++	st7789_lcd_reset();
++
++	for (i = 0; i < sizeof(st7789_init_data); i = i + data_len + 1) {
++		st7789_lcd_write_cmd(st7789_init_data[i]);
++
++		i++; /* shift to data len */
++		data_len = st7789_init_data[i];
++
++		for (j = 0; j < data_len; j++) {
++			st7789_lcd_write_data(st7789_init_data[i + j + 1]);
++		}
++	}
++}
++
++static void st7789_dma_init(void *lcdbase)
++{
++	u32 val;
++
++	val = 0;
++	s3c2440_dma_set_src(DMA_CHL, (u32)lcdbase, val);
++
++	val = 0;
++	val |= S3C2440_DMA_DIDSTC_LOC(1);
++	val |= S3C2440_DMA_DIDSTC_INC(1);
++	s3c2440_dma_set_dst(DMA_CHL, s3c2440_spi_get_dataddr(SPI_CHL), val);
++
++	val = 0;
++	val |= S3C2440_DMA_DCON_DMD_HS(1);
++	val |= S3C2440_DMA_DCON_HWSRCSEL(3);
++	val |= S3C2440_DMA_DCON_SWHW_SEL(1);
++	val |= S3C2440_DMA_DCON_TC(115200);
++	s3c2440_dma_set_control(DMA_CHL, val);
++	s3c2440_dma_trigger(DMA_CHL);
++}
++
++static void st7789_lcd_set_gpio(void)
++{
++	struct s3c24x0_gpio * const gpio = s3c24x0_get_base_gpio();
++	u32 val = readl(&gpio->gpgcon);
++	val &= ~(ST7789_RES_GPG(3) | ST7789_DC_GPG(3));
++	val |= ST7789_RES_GPG(GPIO_OUTPUT);
++	val |= ST7789_DC_GPG(GPIO_OUTPUT);
++	writel(val, &gpio->gpgcon);
++	st7789_spi_init();
++}
++
++void lcd_ctrl_init (void *lcdbase)
++{
++	st7789_lcd_set_gpio();
++	st7789_lcd_init();
++	st7789_lcd_dc_data();
++	st7789_dma_init(lcdbase);
++}
++
++__weak void lcd_enable(void)
++{
++
++}
++
++#endif /* CONFIG_LCD */
+diff --git a/include/configs/eins2440.h b/include/configs/eins2440.h
+new file mode 100644
+index 0000000..0ba58a6
+--- /dev/null
++++ b/include/configs/eins2440.h
+@@ -0,0 +1,225 @@
++/*
++ * (C) Copyright 2002
++ * Sysgo Real-Time Solutions, GmbH <www.elinos.com>
++ * Marius Groeger <mgroeger@sysgo.de>
++ * Gary Jennejohn <garyj@denx.de>
++ * David Mueller <d.mueller@elsoft.ch>
++ *
++ * Configuation settings for the SAMSUNG EINS2440 board.
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __CONFIG_H
++#define __CONFIG_H
++
++/*
++ * High Level Configuration Options
++ * (easy to change)
++ */
++#define CONFIG_S3C24X0		/* This is a SAMSUNG S3C24x0-type SoC */
++#define CONFIG_S3C2440		/* specifically a SAMSUNG S3C2440 SoC */
++#define CONFIG_EINS2440		/* on a SAMSUNG EINS2440 Board */
++
++#define CONFIG_SYS_TEXT_BASE	0x0
++
++#define CONFIG_SYS_ARM_CACHE_WRITETHROUGH
++
++/* input clock of PLL (the EINS2440 has 12MHz input clock) */
++#define CONFIG_SYS_CLK_FREQ	12000000
++
++#define CONFIG_CMDLINE_TAG	/* enable passing of ATAGs */
++#define CONFIG_SETUP_MEMORY_TAGS
++#define CONFIG_INITRD_TAG
++
++/*
++ * Hardware drivers
++ */
++#define CONFIG_DRIVER_DM9000
++#define CONFIG_DM9000_BASE      0x20000000
++#define DM9000_IO       CONFIG_DM9000_BASE
++#define DM9000_DATA     (CONFIG_DM9000_BASE+4)
++#define CONFIG_ETHADDR  08:00:3e:26:0a:5b
++
++/*
++ * LEDs
++ */
++#define CONFIG_STATUS_LED
++#define CONFIG_BOARD_SPECIFIC_LED
++#define CONFIG_GPIO_LED
++#define CONFIG_S3C2440_GPIO
++#define CONFIG_GPIO_LED_STUBS
++#define STATUS_LED_BIT        0x0010
++#define STATUS_LED_PERIOD     (CONFIG_SYS_HZ / 2)
++#define STATUS_LED_STATE      STATUS_LED_OFF
++#define STATUS_LED_BIT1      0x0011
++#define STATUS_LED_PERIOD1   (CONFIG_SYS_HZ / 2)
++#define STATUS_LED_STATE1    STATUS_LED_OFF
++#define STATUS_LED_BIT2       0x0012
++#define STATUS_LED_PERIOD2    (CONFIG_SYS_HZ / 2)
++#define STATUS_LED_STATE2     STATUS_LED_OFF
++#define STATUS_LED_BIT3      0x0013
++#define STATUS_LED_PERIOD3   (CONFIG_SYS_HZ / 2)
++#define STATUS_LED_STATE3    STATUS_LED_OFF
++#define CONFIG_GPIO_LED_INVERTED_TABLE {STATUS_LED_BIT, STATUS_LED_BIT1, STATUS_LED_BIT2, STATUS_LED_BIT3}
++
++#define CONFIG_S3C2440_SPI
++#define CONFIG_S3C2440_DMA
++
++/*
++ * LCD
++ */
++#define CONFIG_LCD
++#define CONFIG_ST7789_LCD
++#define LCD_BPP LCD_COLOR16
++/* #define CONFIG_VIDEO_FONT_4X6 */
++#define CONFIG_CONSOLE_SCROLL_LINES  1
++
++#define CONFIG_LCD_LOGO
++#define CONFIG_VIDEO_LOGO
++#define CONFIG_VIDEO_BMP_LOGO
++
++/*
++ * select serial console configuration
++ */
++#define CONFIG_S3C24X0_SERIAL
++#define CONFIG_SERIAL1		1	/* we use SERIAL 1 on EINS2440 */
++
++/************************************************************
++ * USB support (currently only works with D-cache off)
++ ************************************************************/
++#define CONFIG_USB_OHCI
++#define CONFIG_USB_OHCI_S3C24XX
++#define CONFIG_DOS_PARTITION
++
++/************************************************************
++ * RTC
++ ************************************************************/
++#define CONFIG_RTC_S3C24X0
++
++#define CONFIG_BAUDRATE		115200
++
++/*
++ * BOOTP options
++ */
++#define CONFIG_BOOTP_BOOTFILESIZE
++#define CONFIG_BOOTP_BOOTPATH
++#define CONFIG_BOOTP_GATEWAY
++#define CONFIG_BOOTP_HOSTNAME
++
++/*
++ * Command line configuration.
++ */
++#define CONFIG_CMD_BSP
++#define CONFIG_CMD_DATE
++#define CONFIG_CMD_NAND
++#define CONFIG_CMD_REGINFO
++#define CONFIG_CMD_LED
++
++#define CONFIG_CMDLINE_EDITING
++
++/* autoboot */
++#define CONFIG_BOOT_RETRY_TIME	-1
++#define CONFIG_RESET_TO_RETRY
++
++#define CONFIG_NETMASK		255.255.255.0
++#define CONFIG_IPADDR		10.0.0.110
++#define CONFIG_SERVERIP		10.0.0.1
++
++#if defined(CONFIG_CMD_KGDB)
++#define CONFIG_KGDB_BAUDRATE	115200	/* speed to run kgdb serial port */
++#endif
++
++/*
++ * Miscellaneous configurable options
++ */
++#define CONFIG_SYS_LONGHELP		/* undef to save memory */
++#define CONFIG_SYS_CBSIZE	256
++/* Print Buffer Size */
++#define CONFIG_SYS_PBSIZE	(CONFIG_SYS_CBSIZE + \
++				sizeof(CONFIG_SYS_PROMPT)+16)
++#define CONFIG_SYS_MAXARGS	16
++#define CONFIG_SYS_BARGSIZE	CONFIG_SYS_CBSIZE
++
++#define CONFIG_SYS_MEMTEST_START	0x30000000	/* memtest works on */
++#define CONFIG_SYS_MEMTEST_END		0x33F00000	/* 63 MB in DRAM */
++
++#define CONFIG_SYS_LOAD_ADDR		0x30800000
++
++/* support additional compression methods */
++#define CONFIG_BZIP2
++#define CONFIG_LZO
++#define CONFIG_LZMA
++
++/*-----------------------------------------------------------------------
++ * Physical Memory Map
++ */
++#define CONFIG_NR_DRAM_BANKS	1          /* we have 1 bank of DRAM */
++#define PHYS_SDRAM_1		0x30000000 /* SDRAM Bank #1 */
++#define PHYS_SDRAM_1_SIZE	0x04000000 /* 64 MB */
++
++#define PHYS_FLASH_1		0x00000000 /* Flash Bank #0 */
++
++#define CONFIG_SYS_FLASH_BASE	PHYS_FLASH_1
++
++/*-----------------------------------------------------------------------
++ * FLASH and environment organization
++ */
++
++#define CONFIG_SYS_FLASH_CFI
++#define CONFIG_FLASH_CFI_DRIVER
++#define CONFIG_FLASH_CFI_LEGACY
++#define CONFIG_SYS_FLASH_LEGACY_512Kx16
++#define CONFIG_FLASH_SHOW_PROGRESS	45
++
++#define CONFIG_SYS_MAX_FLASH_BANKS	1
++#define CONFIG_SYS_FLASH_BANKS_LIST     { CONFIG_SYS_FLASH_BASE }
++#define CONFIG_SYS_MAX_FLASH_SECT	(128)
++
++#define CONFIG_ENV_ADDR			(CONFIG_SYS_FLASH_BASE + 0x180000)
++#define CONFIG_ENV_IS_IN_FLASH
++#define CONFIG_ENV_SIZE			0x10000
++/* allow to overwrite serial and ethaddr */
++#define CONFIG_ENV_OVERWRITE
++
++/*
++ * Size of malloc() pool
++ * BZIP2 / LZO / LZMA need a lot of RAM
++ */
++#define CONFIG_SYS_MALLOC_LEN	(4 * 1024 * 1024)
++
++#define CONFIG_SYS_MONITOR_LEN	(448 * 1024)
++#define CONFIG_SYS_MONITOR_BASE	CONFIG_SYS_FLASH_BASE
++
++/*
++ * NAND configuration
++ */
++#ifdef CONFIG_CMD_NAND
++#define CONFIG_NAND_S3C2440
++#define CONFIG_SYS_S3C2440_NAND_HWECC
++#define CONFIG_SYS_MAX_NAND_DEVICE	1
++#define CONFIG_SYS_NAND_BASE		0x4E000000
++#define CONFIG_S3C24XX_CUSTOM_NAND_TIMING
++#define CONFIG_S3C24XX_TACLS	1
++#define CONFIG_S3C24XX_TWRPH0	4
++#define CONFIG_S3C24XX_TWRPH1	1
++#endif
++
++/*
++ * File system
++ */
++#define CONFIG_CMD_UBIFS
++#define CONFIG_CMD_MTDPARTS
++#define CONFIG_MTD_DEVICE
++#define CONFIG_MTD_PARTITIONS
++/* #define CONFIG_YAFFS2 */
++#define CONFIG_RBTREE
++
++/* additions for new relocation code, must be added to all boards */
++#define CONFIG_SYS_SDRAM_BASE	PHYS_SDRAM_1
++#define CONFIG_SYS_INIT_SP_ADDR	(CONFIG_SYS_SDRAM_BASE + 0x1000 - \
++				GENERATED_GBL_DATA_SIZE)
++
++#define CONFIG_BOARD_EARLY_INIT_F
++
++#endif /* __CONFIG_H */
+diff --git a/include/env_default.h b/include/env_default.h
+index ea6704a..e264b5a 100644
+--- a/include/env_default.h
++++ b/include/env_default.h
+@@ -52,6 +52,9 @@ const uchar default_environment[] = {
+ #ifdef	CONFIG_ETHPRIME
+ 	"ethprime="	CONFIG_ETHPRIME			"\0"
+ #endif
++#ifdef  CONFIG_ETHADDR
++    "ethaddr="  __stringify(CONFIG_ETHADDR)    "\0"
++#endif
+ #ifdef	CONFIG_IPADDR
+ 	"ipaddr="	__stringify(CONFIG_IPADDR)	"\0"
+ #endif
+diff --git a/include/lcd.h b/include/lcd.h
+index f76fca7..cecd4af 100644
+--- a/include/lcd.h
++++ b/include/lcd.h
+@@ -196,13 +196,13 @@ void lcd_sync(void);
+ #define NBYTES(bit_code)	(NBITS(bit_code) >> 3)
+ #else /* 16bpp color definitions */
+ # define CONSOLE_COLOR_BLACK	0x0000
+-# define CONSOLE_COLOR_RED	0xF800
+-# define CONSOLE_COLOR_GREEN	0x07E0
+-# define CONSOLE_COLOR_YELLOW	0xFFE0
+-# define CONSOLE_COLOR_BLUE	0x001F
+-# define CONSOLE_COLOR_MAGENTA	0xF81F
+-# define CONSOLE_COLOR_CYAN	0x07FF
+-# define CONSOLE_COLOR_GREY	0xC618
++# define CONSOLE_COLOR_RED	0x00F8
++# define CONSOLE_COLOR_GREEN	0xE007
++# define CONSOLE_COLOR_YELLOW	0xE0FF
++# define CONSOLE_COLOR_BLUE	0x1F00
++# define CONSOLE_COLOR_MAGENTA	0x1FF8
++# define CONSOLE_COLOR_CYAN	0xFF07
++# define CONSOLE_COLOR_GREY	0x18C6
+ # define CONSOLE_COLOR_WHITE	0xffff		/* Must remain last / highest */
+ #endif /* color definitions */
+ 
+diff --git a/include/s3c2440_dma.h b/include/s3c2440_dma.h
+new file mode 100644
+index 0000000..5330dcc
+--- /dev/null
++++ b/include/s3c2440_dma.h
+@@ -0,0 +1,78 @@
++/*
++ * s3c2440 DMA Controller
++ */
++#ifndef __S3C2440_DMA_H__
++#define __S3C2440_DMA_H__
++
++#define S3C2440_DMA_CHL0		(0)
++#define S3C2440_DMA_CHL1		(1)
++#define S3C2440_DMA_CHL2		(2)
++#define S3C2440_DMA_CHL3		(3)
++
++/* 
++ Select one between Demand mode and Handshake mode.
++ 0: Demand mode will be selected.
++ 1: Handshake mode will be selected.
++*/
++#define S3C2440_DMA_DCON_DMD_HS(x)  ((x)<<31)
++
++/* 
++ * Select DMA request source for each DMA.
++ * DCON0: 000:nXDREQ0 001:UART0 010:SDI 011:Timer
++ * 100:USB device EP1
++ * DCON1: 000:nXDREQ1 001:UART1 010:I2SSDI 011:SPI
++ * 100:USB device EP2
++ * DCON2: 000:I2SSDO 001:I2SSDI 010:SDI 011:Timer
++ * 100:USB device EP3
++ * DCON3: 000:UART2 001:SDI 010:SPI 011:Timer
++ * 100:USB device EP4
++ * DCON0: 101:I2SSDO 110:PCMIN
++ * DCON1: 101:PCMOUT 110:SDI
++ * DCON2: 101:PCMIN 110:MICIN
++ * DCON3: 101:MICIN 110:PCMOUT
++*/
++#define S3C2440_DMA_DCON_HWSRCSEL(x)  ((x)<<24)
++
++/* 
++ * Select the DMA source between software (S/W request mode) and
++ * hardware (H/W request mode).
++ * 0: S/W request mode is selected and DMA is triggered by setting
++ * SW_TRIG bit of DMASKTRIG control register.
++ * 1: DMA source selected by bit[26:24] triggers the DMA operation.
++*/
++#define S3C2440_DMA_DCON_SWHW_SEL(x)  ((x)<<23)
++
++/* 
++ * Initial transfer count (or transfer beat).
++ * Note that the actual number of bytes that are transferred is
++ * computed by the following equation: DSZ x TSZ x TC. Where, DSZ,
++ * TSZ (1 or 4), and TC represent data size DCONn[21:20], transfer
++ * size DCONn[28], and initial transfer count, respectively. This value
++ * will be loaded into CURR_TC only if the CURR_TC is 0 and the
++ * DMA ACK is 1.
++*/
++#define S3C2440_DMA_DCON_TC(x)  ((x)<<0)
++
++/* 
++ * Determine how SPTDAT is read/written
++ * 00 = polling mode 01 = interrupt mode
++ * 10 = DMA mode 11 = reserved
++*/
++#define S3C2440_DMA_DISRCC_LOC(x)  ((x)<<1)
++#define S3C2440_DMA_DIDSTC_LOC(x)  ((x)<<1)
++
++/* 
++ * Determine how SPTDAT is read/written
++ * 00 = polling mode 01 = interrupt mode
++ * 10 = DMA mode 11 = reserved
++*/
++#define S3C2440_DMA_DISRCC_INC(x)  ((x)<<0)
++#define S3C2440_DMA_DIDSTC_INC(x)  ((x)<<0)
++
++void s3c2440_dma_set_src(u8 chl, u32 disrc, u32 disrcc);
++void s3c2440_dma_set_dst(u8 chl, u32 didst, u32 didstc);
++void s3c2440_dma_set_control(u8 chl, u32 val);
++void s3c2440_dma_trigger(u8 chl);
++
++#endif /*__S3C2440_DMA_H__*/
++
+diff --git a/include/s3c2440_spi.h b/include/s3c2440_spi.h
+new file mode 100644
+index 0000000..aefe57f
+--- /dev/null
++++ b/include/s3c2440_spi.h
+@@ -0,0 +1,55 @@
++/*
++ * s3c2440 SPI Controller
++ */
++#ifndef __S3C2440_SPI_H__
++#define __S3C2440_SPI_H__
++
++/* 
++ * Determine how SPTDAT is read/written
++ * 00 = polling mode 01 = interrupt mode
++ * 10 = DMA mode 11 = reserved
++*/
++#define S3C2440_SPI_SPCON_SMOD(x)	((x)<<5)
++
++/* 
++ * Determine whether you want SCK enabled or not (master only).
++ * 0 = disable 1 = enable
++*/
++#define S3C2440_SPI_SPCON_ENSCK(x)	((x)<<4)
++
++/* 
++ * Determine the desired mode (master or slave).
++ * 0 = slave 1 = master
++*/
++#define S3C2440_SPI_SPCON_MSTR(x)	((x)<<3)
++
++/* 
++ * Determine an active high or active low clock.
++ * 0 = active high 1 = active low
++*/
++#define S3C2440_SPI_SPCON_CPOL(x)	((x)<<2)
++
++/* 
++ * Select one of the two fundamentally different transfer format
++ * 0 = format A 1 = format B
++*/
++#define S3C2440_SPI_SPCON_CPHA(x)	((x)<<1)
++
++/* 
++ * Decide whether the receiving data is required or not.
++ * 0 = normal mode 1 = Tx auto garbage data mode
++*/
++#define S3C2440_SPI_SPCON_TAGD(x)	((x)<<0)
++
++#define S3C2440_SPI_CHL0		(0)
++#define S3C2440_SPI_CHL1		(1)
++
++u32 s3c2440_spi_get_dataddr(u8 chl);
++void s3c2440_spi_set_baudrate(u8 chl, int baudrate);
++void s3c2440_spi_set_control(u8 chl, u32 val);
++void s3c2440_spi_write(u8 chl, u8 data);
++u8 s3c2440_spi_write_read(u8 chl, u8 data);
++void s3c2440_spi_gpio_init(u8 chl);
++
++#endif /*__S3C2440_SPI_H__*/
++
+diff --git a/scripts/config_whitelist.txt b/scripts/config_whitelist.txt
+index d476367..a469d07 100644
+--- a/scripts/config_whitelist.txt
++++ b/scripts/config_whitelist.txt
+@@ -1024,6 +1024,7 @@ CONFIG_EHCI_IS_TDI
+ CONFIG_EHCI_MMIO_BIG_ENDIAN
+ CONFIG_EHCI_MXS_PORT0
+ CONFIG_EHCI_MXS_PORT1
++CONFIG_EINS2440
+ CONFIG_ELBC_NAND_SPL_STATIC_PGSIZE
+ CONFIG_EMAC_MDIO_PHY_NUM
+ CONFIG_EMAC_NR_START
+@@ -3312,6 +3313,7 @@ CONFIG_NAND_OMAP_GPMC_PREFETCH
+ CONFIG_NAND_OMAP_GPMC_WSCFG
+ CONFIG_NAND_PLAT
+ CONFIG_NAND_S3C2410
++CONFIG_NAND_S3C2440
+ CONFIG_NAND_SECBOOT
+ CONFIG_NAND_SPL
+ CONFIG_NAND_U_BOOT
+@@ -7395,6 +7397,7 @@ CONFIG_SYS_RTC_SETUP
+ CONFIG_SYS_RV3029_TCR
+ CONFIG_SYS_RX_ETH_BUFFER
+ CONFIG_SYS_S3C2410_NAND_HWECC
++CONFIG_SYS_S3C2440_NAND_HWECC
+ CONFIG_SYS_SATA
+ CONFIG_SYS_SATA1
+ CONFIG_SYS_SATA1_FLAGS
+diff --git a/tools/Makefile b/tools/Makefile
+index 9edb504..534345f 100644
+--- a/tools/Makefile
++++ b/tools/Makefile
+@@ -215,7 +215,7 @@ LOGO-$(CONFIG_VIDEO_LOGO) += $(LOGO_DATA_H)
+ 
+ # Generic logo
+ ifeq ($(LOGO_BMP),)
+-LOGO_BMP= $(srctree)/$(src)/logos/denx.bmp
++LOGO_BMP= $(srctree)/$(src)/logos/eins2440.bmp
+ 
+ # Use board logo and fallback to vendor
+ ifneq ($(wildcard $(srctree)/$(src)/logos/$(BOARD).bmp),)
+diff --git a/tools/logos/eins2440.bmp b/tools/logos/eins2440.bmp
+new file mode 100644
+index 0000000000000000000000000000000000000000..37a5bf51ffb243dfee13a6f2e76149c674321df4
+GIT binary patch
+literal 13078
+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
+F{|3t>)BFGc
+
+literal 0
+HcmV?d00001
+
+-- 
+2.34.1
+
