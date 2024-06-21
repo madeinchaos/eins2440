@@ -48,7 +48,7 @@ Once the download is complete and reboot, you should see the following screen.
 
 ## Examples of u-boot commands
 
-Miscellaneous
+**Miscellaneous**
 ```
 # bdinfo
 arch_number = 0x000000C1
@@ -79,7 +79,7 @@ GNU ld (GNU Binutils for Ubuntu) 2.38
 # reset
 ```
 
-Norflash
+**Norflash**
 ```
 # flinfo
 
@@ -106,7 +106,7 @@ Copy to Flash... Can't write to protected Flash sectors
 # protect off 1a0000 1affff
 ```
 
-Nandflash
+**Nandflash**
 ```
 # nand info
 
@@ -122,25 +122,25 @@ Device 0: nand0, sector size 128 KiB
 # nand write 30008000 200000 300000 /* 30008000(sdram addr), 200000(nand flash addr) */
 ```
 
-Memory operation
+**Memory operation**
 ```
 # md.b 30008000 f0
 # cp.b 30000000 31000000 f0
 ```
 
-LED control
+**LED control**
 ```
 # led all off
 # led 0 on
 # led 1 toggle
 ```
 
-LCD
+**LCD**
 ```
 # lcdputs "hello world!"
 ```
 
-Network
+**Network**
 ```
 # ping 192.168.0.1
 # dhcp 30008000 zImage.bin
@@ -149,7 +149,7 @@ Network
 # tftpboot 30008000 192.168.1.107:/zImage
 ```
 
-Environment variable
+**Environment variable**
 ```
 # print
 # env set ipaddr 192.168.0.112
@@ -160,4 +160,9 @@ Environment variable
 # setenv test 
 # editenv bootcmd
 edit: nand read 30008000 200000 300000;bootz 30008000 /* multiple commands */
+```
+
+**YAFFS**
+```
+
 ```
