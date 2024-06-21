@@ -17,7 +17,7 @@ Version: tftpd64.464.zip
 **Ensure eins2440 and TFTP server in the same local network.**
 
 Set up the TFTP server as shown below. Current Directory where is the location of the zImage.
-![pic-w100](tftp-setting.PNG)
+![pic-w100](tftp-setting.png)
 
 
 Setting U-Boot environment variables:
