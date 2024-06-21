@@ -9,9 +9,9 @@ Version: busybox-1.35.0
 
 TODO
 
-## Download the rootfs.jffs2 to the eins2440 using the TFTP
+## Download the root.jffs2 to the eins2440 using the TFTP
 **You must download the kernel before you download the root file system.**  
-**Please refer to documentation kernel README.md**
+**Please refer to kernel documentation README.md**
 ```sh
 # download root.jffs2 to SDRAM address 30000000
 # erase nandflash root partition
